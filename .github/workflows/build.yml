@@ -1,0 +1,34 @@
+name: Build workerd (ASan + UBSan)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 git clang-19 lld-19
+
+      - name: Setup Bazel
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Build workerd with sanitizers
+        run: |
+          bazel build -c dbg //src/workerd/server:workerd \
+            --action_env=CC=/usr/bin/clang-19 \
+            --action_env=CXX=/usr/bin/clang++-19 \
+            --copt=-O1 --cxxopt=-O1 \
+            --copt=-g --cxxopt=-g \
+            --copt=-fno-omit-frame-pointer --cxxopt=-fno-omit-frame-pointer \
+            --copt=-fsanitize=address --cxxopt=-fsanitize=address --linkopt=-fsanitize=address \
+            --copt=-fsanitize=undefined --cxxopt=-fsanitize=undefined --linkopt=-fsanitize=undefined \
+            --linkopt=-fuse-ld=lld
+
+      - name: Upload sanitized binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: workerd-asan-ubsan
+          path: bazel-bin/src/workerd/server/workerd
